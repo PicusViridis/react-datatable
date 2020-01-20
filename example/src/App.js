@@ -15,11 +15,12 @@ function onRefresh(props) {
 }
 
 export default function App() {
-  const { headers, rows, footer } = useTable({
+  const { headers, filters, rows, footer } = useTable({
     columns,
     items,
     editable: true,
     sortable: true,
+    filterable: true,
     onRefresh
   });
 
@@ -29,6 +30,11 @@ export default function App() {
         <thead>
           <tr>
             {headers.map((cell, i) => (
+              <th key={i}>{cell}</th>
+            ))}
+          </tr>
+          <tr>
+            {filters.map((cell, i) => (
               <th key={i}>{cell}</th>
             ))}
           </tr>

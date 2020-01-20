@@ -11,6 +11,11 @@ function DefaultHeaderRenderer({ column, sort, onClick }) {
     )
 }
 
+function DefaultFilterRenderer({ column, filters, onChange }) {
+    const value = typeof filters[column.accessor] === 'undefined' ? '' : filters[column.accessor]
+    return <input type="text" value={value} onChange={e => onChange(column, e.target.value)} />
+}
+
 function DefaultCellRenderer({ column, item, onClick }) {
     return <div onClick={() => onClick(column, item)}>{item[column.accessor]}</div>
 }
@@ -39,6 +44,14 @@ function renderHeader(column, sort, onClick) {
     )
 }
 
+function renderFilters(column, filters, onChange) {
+    return typeof column.filterRenderer === 'function' ? (
+        column.filterRenderer(column, filters, onChange)
+    ) : (
+        <DefaultFilterRenderer column={column} filters={filters} onChange={onChange} />
+    )
+}
+
 function renderCell(column, item, edition, onChange, onClick) {
     if (edition.col === column && edition.item === item) {
         return renderEdition(column, item, onChange, onClick)
@@ -58,11 +71,9 @@ function renderEdition(column, item, onChange, onClick) {
     )
 }
 
-function useSort(defaultSort, sortable) {
+function useSort(defaultSort) {
     const [col, dir] = defaultSort.split('|')
     const [sort, _setSort] = useState({ col, dir })
-
-    if (!sortable) return ['', emptyFn]
 
     function setSort(col) {
         if (sort.col !== col || sort.dir === 'desc') {
@@ -73,6 +84,16 @@ function useSort(defaultSort, sortable) {
     }
 
     return [sort, setSort]
+}
+
+function useFilters(defaultFilters) {
+    const [filters, _setFilters] = useState(defaultFilters)
+
+    function setFilters(col, value) {
+        _setFilters({ ...filters, [col.accessor]: value })
+    }
+
+    return [filters, setFilters]
 }
 
 function useEdition(defaultEdition, editable) {
@@ -99,7 +120,7 @@ function useData(defaultData) {
     }
 
     function deleteItem(item) {
-        setItems(items.filter(i => i !== item))
+        setItems(items.filters(i => i !== item))
     }
 
     function changeItem(item) {
@@ -116,21 +137,29 @@ export function useTable({
     onRefresh = emptyFn,
     columns = [],
     items: defaultItems = [],
-    defaultSort = ''
+    defaultSort = '',
+    defaultFilter = {}
 } = {}) {
     const footer = ''
 
     const [items, addItem, deleteItem, changeItem] = useData(defaultItems)
     const [sort, setSort] = useSort(defaultSort, sortable)
+    const [filters, setFilters] = useFilters(defaultFilter, filterable)
     const [edition, setEdition] = useEdition({ col: null, item: null }, editable)
 
     useEffect(() => {
-        onRefresh({ items, sort })
-    }, [onRefresh, items, sort])
+        onRefresh({ items, sort, filters })
+    }, [onRefresh, items, sort, filters])
 
     function onSort(column) {
         if (sortable) {
             setSort(column.accessor)
+        }
+    }
+
+    function onFilter(column, value) {
+        if (filterable) {
+            setFilters(column, value)
         }
     }
 
@@ -151,7 +180,9 @@ export function useTable({
 
     const headers = columns.map(column => renderHeader(column, sort, onSort))
 
+    const _filters = !filterable ? [] : columns.map(column => renderFilters(column, filters, onFilter))
+
     const rows = items.map(item => columns.map(column => renderCell(column, item, edition, onChange, onEdit)))
 
-    return { headers, rows, footer }
+    return { headers, filters: _filters, rows, footer }
 }
